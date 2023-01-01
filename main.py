@@ -2,6 +2,9 @@ class function:
     def derive(self):
         raise NotImplementedError
 
+    def simplify(self):
+        return self
+
 
 class Number(function):
     number: int
@@ -18,17 +21,47 @@ class Number(function):
     def __repr__(self):
         return f"Number({self.number})"
 
+    def __eq__(self, other):
+        if isinstance(other, int):
+            return self.number == other
+        elif isinstance(other,Number):
+            return self.number == other.number
+
+
+
+
 class Addition(function):
     addition_list: list[function,...]
     def __init__(self, addition_list):
         self.addition_list = addition_list
 
+    def simplify(self):
+        new=[]
+        num=0
+        for i in self.addition_list:
+            i=i.simplify()
+            if isinstance(i,Addition):
+                for j in i.addition_list:
+                    if isinstance(j,Number):
+                        num+=j.number
+                    else:
+                        new.append(j)
+            elif isinstance(i,Number):
+                num+=i.number
+            else:
+                new.append(i)
+        if num!=0:
+            new.insert(0,Number(num))
+        if len(new)==1:
+            return new[0]
+        return Addition(new)
+
 
     def derive(self):
-        return [func.derive() for func in self.addition_list]
+        return Addition([func.derive() for func in self.addition_list])
 
     def __str__(self):
-        return "(" + " + ".join(str([str(func) for func in self.addition_list])) + ")"
+        return "(" + "+".join([str(func) for func in self.addition_list]) + ")"
 
 
     def __repr__(self):
@@ -40,6 +73,28 @@ class Product(function):
     def __init__(self, product_list):
         self.product_list = product_list
 
+    def simplify(self):
+        new = []
+        num = 1
+        for i in self.product_list:
+            i=i.simplify()
+            if isinstance(i,Product):
+                for j in i.product_list:
+                    if isinstance(j,Number):
+                        num*=j.number
+                    else:
+                        new.append(j)
+            elif isinstance(i,Number):
+                num*=i.number
+            else:
+                new.append(i)
+        if num==0:
+            return Number(0)
+        elif num!=1:
+            new.insert(0,Number(num))
+        if len(new)==1:
+            return new[0]
+        return Product(new)
     def derive(self):
         curr = self.product_list[0]
         for function in self.product_list[1:]:
@@ -50,7 +105,7 @@ class Product(function):
         return Addition([Product([first, second.derive()]), Product([first.derive(), second])])
 
     def __str__(self):
-        return "(" + " * ".join([str(func) for func in self.product_list]) + ")"
+        return "(" + "*".join([str(func) for func in self.product_list]) + ")"
 
 
     def __repr__(self):
@@ -58,24 +113,46 @@ class Product(function):
 
 
 class Exponent(function):
-    power: int
+    power: function
+    base: function
 
-    def __init__(self, power):
+    def __init__(self, power, base):
         self.power = power
+        self.base = base
 
+    def simplify(self):
+        self.power=self.power.simplify()
+        self.base=self.base.simplify()
+        if self.power==1:
+            return self.base
+        elif self.power==0:
+            return Number(1)
+        elif self.base==1:
+            return Number(1)
+        elif self.base==0:
+            return Number(0)
+        return self
     def derive(self) -> function:
-        return Product([Number(self.power), Exponent(self.power - 1)])
+        return Product([Exponent(self.power,self.base), Addition([Product([self.power.derive(),self.base]), Product([self.power,self.base.derive(),Exponent(Number(-1),self.base)])])])
 
     def __str__(self):
-        if self.power == 1:
-            return "x"
+        if self.power==1:
+            return str(self.base)
         else:
-            return "x^" + str(self.power)
-
+            return f'{self.base}^{self.power}'
 
     def __repr__(self):
-        return f"Exponent({self.power})"
+        return f"Exponent({self.power},{self.base})"
 
+class VarX(function):
+    def derive(self) -> function:
+        return Number(1)
+
+    def __str__(self):
+        return 'x'
+
+    def __repr__(self):
+        return 'VarX()'
 
 class Composition(function):
     parent: function
@@ -97,6 +174,11 @@ class Composition(function):
     def __repr__(self):
         return f"Composition({self.parent.__repr__()}, {self.child.__repr__()})"
 
-print(Composition(Exponent(2), Exponent(2)).derive())
+test=Exponent(VarX(),VarX())
+print(repr(test.derive()))
+print(test)
+print(repr(test.derive().simplify()))
+print(test.derive().simplify())
+#print(Product([VarX(),Number(2)]).simplify())
 
 #(2x)^2
