@@ -97,6 +97,6 @@ class Composition(function):
     def __repr__(self):
         return f"Composition({self.parent.__repr__()}, {self.child.__repr__()})"
 
-print(Composition(Exponent(2), Product([Number(2), Exponent(1)])).derive().__repr__())
+print(Composition(Exponent(2), Exponent(2)).derive())
 
 #(2x)^2
